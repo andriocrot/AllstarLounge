@@ -724,3 +724,124 @@
         if (id === 'levels') refreshLevelsPanel();
       }
       function refreshLevelsPanel() {
+        var sessions = loadSessions();
+        var totalHands = 0, match = 0;
+        sessions.forEach(function(s) {
+          var h = s.hands || [];
+          totalHands += h.length;
+          h.forEach(function(hand) {
+            if ((hand.action_taken || '').toLowerCase() === (hand.ai_suggestion || '').toLowerCase()) match++;
+          });
+        });
+        var level = totalHands === 0 ? 0 : Math.min(19, Math.floor(totalHands / 50) + Math.floor((match / totalHands) * 5));
+        var nextHands = (level + 1) * 50;
+        var el = document.getElementById('l-current');
+        if (el) el.textContent = level;
+        el = document.getElementById('l-next-hands');
+        if (el) el.textContent = Math.max(0, nextHands - totalHands);
+        var listEl = document.getElementById('levels-list');
+        if (listEl) {
+          listEl.innerHTML = '';
+          for (var i = 0; i < LEVEL_TITLES.length; i++) {
+            var li = document.createElement('li');
+            li.textContent = (i + 1) + '. ' + LEVEL_TITLES[i];
+            if (i === level) li.style.color = 'var(--accent)';
+            listEl.appendChild(li);
+          }
+        }
+      }
+      function loadSettingsIntoForm() {
+        const s = loadSettings();
+        document.getElementById('setting-rpc').value = s.rpc || 'https://rpc.ankr.com/eth';
+        document.getElementById('setting-contract').value = s.contract || '';
+      }
+      function refreshStats() {
+        const sessions = loadSessions();
+        let totalHands = 0, match = 0;
+        const actions = {};
+        sessions.forEach(function(s) {
+          const h = s.hands || [];
+          totalHands += h.length;
+          h.forEach(function(hand) {
+            const a = (hand.action_taken || 'unknown').toLowerCase();
+            actions[a] = (actions[a] || 0) + 1;
+            if ((hand.action_taken || '').toLowerCase() === (hand.ai_suggestion || '').toLowerCase()) match++;
+          });
+        });
+        const level = totalHands === 0 ? 0 : Math.min(19, Math.floor(totalHands / 50) + Math.floor((match / totalHands) * 5));
+        document.getElementById('s-sessions').textContent = sessions.length;
+        document.getElementById('s-hands').textContent = totalHands;
+        document.getElementById('s-agreement').textContent = totalHands ? (100 * match / totalHands).toFixed(1) + '%' : '0%';
+        document.getElementById('s-level').textContent = level;
+        const actionsEl = document.getElementById('stats-actions');
+        actionsEl.innerHTML = '';
+        Object.keys(actions).sort(function(a,b) { return actions[b] - actions[a]; }).forEach(function(a) {
+          const div = document.createElement('div');
+          div.textContent = a + ': ' + actions[a];
+          div.style.marginTop = '0.25rem';
+          actionsEl.appendChild(div);
+        });
+      }
+      function renderSessionList() {
+        const sessions = loadSessions();
+        const ul = document.getElementById('session-list');
+        ul.innerHTML = '';
+        sessions.slice(-25).reverse().forEach(function(s) {
+          const li = document.createElement('li');
+          const hands = (s.hands || []).length;
+          li.innerHTML = '<span class="session-id">' + (s.session_id || '?').slice(0, 16) + '...</span> ' +
+            '<span class="badge tier">T' + (s.stakes_tier || 0) + '</span> <span class="badge hands">' + hands + ' hands</span>';
+          ul.appendChild(li);
+        });
+      }
+
+      document.querySelectorAll('.nav-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          showPanel(btn.getAttribute('data-panel'));
+        });
+      });
+
+      document.getElementById('btn-eval').addEventListener('click', function() {
+        const input = document.getElementById('eval-cards').value.trim().split(/\s+/);
+        const cards = [];
+        for (let i = 0; i < input.length && cards.length < 7; i++) {
+          const c = parseCard(input[i]);
+          if (c) cards.push(c);
+        }
+        const resultEl = document.getElementById('eval-result');
+        if (cards.length < 5) {
+          resultEl.style.display = 'none';
+          return;
+        }
+        const ev = cards.length === 5 ? evaluateHand(cards) : bestFiveFromSeven(cards);
+        if (!ev) { resultEl.style.display = 'none'; return; }
+        document.getElementById('eval-hand-name').textContent = HAND_NAMES[ev.type - 1] || 'Unknown';
+        document.getElementById('eval-kickers').textContent = 'Kickers: ' + (ev.kickers || []).join(', ');
+        resultEl.style.display = 'block';
+      });
+
+      document.getElementById('btn-preflop').addEventListener('click', function() {
+        const holeStr = document.getElementById('preflop-hole').value.trim().split(/\s+/);
+        const hole = [];
+        if (holeStr.length >= 2) {
+          const c1 = parseCard(holeStr[0]), c2 = parseCard(holeStr[1]);
+          if (c1 && c2) hole.push(c1, c2);
+        }
+        const resultEl = document.getElementById('preflop-result');
+        if (hole.length !== 2) { resultEl.style.display = 'none'; return; }
+        const pos = document.getElementById('preflop-position').value;
+        const tier = parseInt(document.getElementById('preflop-tier').value, 10) || 5;
+        const sug = suggestPreflop(hole, pos, tier);
+        document.getElementById('preflop-action').textContent = sug.action.toUpperCase() + ' (confidence: ' + (sug.confidence * 100).toFixed(0) + '%)';
+        document.getElementById('preflop-reasoning').textContent = sug.reasoning;
+        resultEl.style.display = 'block';
+      });
+
+      document.getElementById('btn-postflop').addEventListener('click', function() {
+        const holeStr = document.getElementById('postflop-hole').value.trim().split(/\s+/);
+        const boardStr = document.getElementById('postflop-board').value.trim().split(/\s+/);
+        const hole = [];
+        if (holeStr.length >= 2) {
+          const c1 = parseCard(holeStr[0]), c2 = parseCard(holeStr[1]);
+          if (c1 && c2) hole.push(c1, c2);
+        }
