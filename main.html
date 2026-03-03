@@ -240,3 +240,124 @@
       margin-top: 0.5rem;
     }
     .progress-bar .fill {
+      height: 100%;
+      background: var(--accent);
+      transition: width 0.3s ease;
+    }
+    .level-title { font-size: 0.9rem; color: var(--success); margin-top: 0.25rem; }
+    .help-section { margin-top: 1rem; padding: 1rem; background: var(--bg-dark); border-radius: var(--radius); }
+    .help-section h4 { margin-bottom: 0.5rem; color: var(--accent); }
+    .range-legend { display: flex; gap: 1rem; margin-top: 0.5rem; font-size: 0.8rem; }
+    .range-legend span { display: flex; align-items: center; gap: 0.25rem; }
+    .range-legend .swatch { width: 12px; height: 12px; border-radius: 2px; }
+    .swatch.raise { background: rgba(63,185,80,0.5); }
+    .swatch.call { background: rgba(210,153,34,0.5); }
+    .swatch.fold { background: rgba(248,81,73,0.3); }
+    .hand-history-item { padding: 0.5rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    .hand-history-item .action { color: var(--accent); }
+    .hand-history-item .ai { color: var(--text-muted); }
+    .empty-state { text-align: center; padding: 2rem; color: var(--text-muted); }
+    .tier-selector { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .tier-selector button { padding: 0.35rem 0.75rem; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg-dark); color: var(--text); cursor: pointer; }
+    .tier-selector button.active { background: var(--accent); color: var(--bg-dark); border-color: var(--accent); }
+    .daily-goal-label { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem; }
+    .panel-intro { color: var(--text-muted); margin-bottom: 1rem; font-size: 0.95rem; }
+    .btn-group { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
+    .btn-group .primary { margin-right: 0; }
+    .kicker-list { font-family: monospace; font-size: 0.85rem; }
+    .position-badge { display: inline-block; padding: 0.2rem 0.5rem; background: var(--border); border-radius: 4px; font-size: 0.8rem; margin-left: 0.5rem; }
+    .about-block { max-width: 60ch; margin-top: 1rem; padding: 1rem; background: var(--bg-dark); border-radius: var(--radius); font-size: 0.9rem; }
+    .about-block h4 { margin-bottom: 0.5rem; color: var(--accent); }
+    .keyboard-hint { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
+    .panel h3 { font-size: 1rem; margin: 1rem 0 0.5rem; color: var(--text-muted); }
+    input[type="number"] { max-width: 120px; }
+    select { max-width: 200px; cursor: pointer; }
+    .stat-card:hover { border: 1px solid var(--border); }
+    .nav-btn:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .primary:focus { outline: 2px solid var(--text); outline-offset: 2px; }
+    @media (max-width: 640px) {
+      header { padding: 1rem; }
+      main { padding: 1rem; }
+      .card-grid { grid-template-columns: repeat(4, 1fr); }
+      .range-matrix { font-size: 0.6rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>AllstarLounge</h1>
+      <p>PokerPro AI Training — AI that makes you pro</p>
+    </div>
+    <nav>
+      <button type="button" class="nav-btn active" data-panel="dashboard">Dashboard</button>
+      <button type="button" class="nav-btn" data-panel="evaluator">Hand Evaluator</button>
+      <button type="button" class="nav-btn" data-panel="ai-preflop">AI Preflop</button>
+      <button type="button" class="nav-btn" data-panel="ai-postflop">AI Postflop</button>
+      <button type="button" class="nav-btn" data-panel="sessions">Sessions</button>
+      <button type="button" class="nav-btn" data-panel="stats">Stats</button>
+      <button type="button" class="nav-btn" data-panel="drills">Drills</button>
+      <button type="button" class="nav-btn" data-panel="range">Range</button>
+      <button type="button" class="nav-btn" data-panel="levels">Levels</button>
+      <button type="button" class="nav-btn" data-panel="help">Help</button>
+      <button type="button" class="nav-btn" data-panel="settings">Settings</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="panel-dashboard" class="panel visible">
+      <h2>Dashboard</h2>
+      <p>Welcome to AllstarLounge — the web interface for PokerPro AI training. Use the tabs above to evaluate hands, get AI suggestions, view sessions, run drills, and inspect range matrices. Data is stored in your browser by default; you can connect to PP1000 or a PokerPro contract for on-chain anchoring.</p>
+      <p class="panel-intro">Start a new session from the Sessions tab, then record hands and compare your decisions to the AI. Your level increases as you play more hands and agree with the AI more often.</p>
+      <div class="about-block">
+        <h4>About PokerPro &amp; PP1000</h4>
+        <p>PokerPro is an on-chain ledger contract for AI poker training: it records sessions, hand hashes, and AI feedback anchors. PP1000 is the desktop app that provides hand evaluation, range training, drills, and optional contract integration. AllstarLounge is this web UI — use it for quick hand evaluation and drills without installing anything.</p>
+      </div>
+      <div class="stats-row" id="dashboard-stats">
+        <div class="stat-card"><span class="value" id="d-total-sessions">0</span><br><span class="label">Sessions</span></div>
+        <div class="stat-card"><span class="value" id="d-total-hands">0</span><br><span class="label">Hands</span></div>
+        <div class="stat-card"><span class="value" id="d-level">0</span><br><span class="label">Level</span></div>
+        <div class="stat-card"><span class="value" id="d-agreement">0%</span><br><span class="label">AI agreement</span></div>
+      </div>
+      <div class="level-title" id="d-level-title">Rookie</div>
+      <div class="progress-bar"><div class="fill" id="d-progress" style="width: 0%"></div></div>
+      <p class="daily-goal-label">Daily goal: <span id="d-daily-hands">0</span> / 50 hands</p>
+    </section>
+
+    <section id="panel-evaluator" class="panel">
+      <h2>Hand Evaluator</h2>
+      <p>Enter 5–7 cards (e.g. As Kh Qd Jc Th). Space-separated.</p>
+      <div class="form-group">
+        <label for="eval-cards">Cards (5–7 space-separated, e.g. As Kh Qd Jc Th)</label>
+        <input type="text" id="eval-cards" placeholder="As Kh Qd Jc Th" />
+      </div>
+      <p class="keyboard-hint">Ranks: 2–9, T, J, Q, K, A. Suits: c, d, h, s.</p>
+      <button type="button" class="primary" id="btn-eval">Evaluate</button>
+      <div class="result-box" id="eval-result" style="display: none;">
+        <span class="hand-name" id="eval-hand-name"></span><br>
+        <span class="kickers" id="eval-kickers"></span>
+      </div>
+    </section>
+
+    <section id="panel-ai-preflop" class="panel">
+      <h2>AI Preflop Suggestion</h2>
+      <div class="form-group">
+        <label for="preflop-hole">Hole cards (e.g. As Kh)</label>
+        <input type="text" id="preflop-hole" placeholder="As Kh" />
+      </div>
+      <div class="form-group">
+        <label for="preflop-position">Position</label>
+        <select id="preflop-position">
+          <option value="utg">UTG</option>
+          <option value="hj">HJ</option>
+          <option value="co">CO</option>
+          <option value="btn" selected>BTN</option>
+          <option value="sb">SB</option>
+          <option value="bb">BB</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="preflop-tier">Stakes tier (0–10). Higher = tighter AI.</label>
+        <input type="number" id="preflop-tier" min="0" max="10" value="5" />
+      </div>
+      <p class="keyboard-hint">Tier 0 = micro, 10 = elite. Default 5 = mid stakes.</p>
