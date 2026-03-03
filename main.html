@@ -845,3 +845,124 @@
           const c1 = parseCard(holeStr[0]), c2 = parseCard(holeStr[1]);
           if (c1 && c2) hole.push(c1, c2);
         }
+        const board = [];
+        boardStr.forEach(function(s) { const c = parseCard(s); if (c) board.push(c); });
+        const resultEl = document.getElementById('postflop-result');
+        if (hole.length !== 2) { resultEl.style.display = 'none'; return; }
+        const potFrac = parseFloat(document.getElementById('postflop-pot').value) || 0.3;
+        const sug = suggestPostflop(hole, board, potFrac);
+        document.getElementById('postflop-action').textContent = sug.action.toUpperCase() + ' (confidence: ' + (sug.confidence * 100).toFixed(0) + '%)';
+        document.getElementById('postflop-reasoning').textContent = sug.reasoning;
+        resultEl.style.display = 'block';
+      });
+
+      document.getElementById('btn-new-session').addEventListener('click', function() {
+        const sessions = loadSessions();
+        const id = 'sess_' + Math.random().toString(36).slice(2) + '_' + Date.now().toString(36);
+        sessions.push({ session_id: id, stakes_tier: 5, opened_at: Date.now() / 1000, hands: [] });
+        saveSessions(sessions);
+        renderSessionList();
+        showPanel('sessions');
+      });
+
+      let drillDeck = [], drillIndex = 0, drillCorrect = 0, drillTotal = 0;
+      const POSITIONS = ['utg','hj','co','btn','sb','bb'];
+      function randomHand() {
+        const ranks = [], suits = [];
+        for (let i = 0; i < 13; i++) ranks.push(i);
+        for (let i = 0; i < 4; i++) suits.push(i);
+        const r1 = ranks[Math.floor(Math.random() * ranks.length)];
+        let r2 = ranks[Math.floor(Math.random() * ranks.length)];
+        let s1 = suits[Math.floor(Math.random() * suits.length)];
+        let s2 = suits[Math.floor(Math.random() * suits.length)];
+        if (r1 === r2 && s1 === s2) s2 = (s2 + 1) % 4;
+        return [{ rank: r1, suit: s1, str: RANK_NAMES[r1] + SUIT_NAMES[s1] }, { rank: r2, suit: s2, str: RANK_NAMES[r2] + SUIT_NAMES[s2] }];
+      }
+      function nextDrillQuestion() {
+        if (drillIndex >= drillTotal) {
+          document.getElementById('drill-question').style.display = 'none';
+          document.getElementById('btn-drill-start').style.display = 'block';
+          alert('Drill complete. Score: ' + drillCorrect + ' / ' + drillTotal);
+          return;
+        }
+        const hole = randomHand();
+        const pos = POSITIONS[Math.floor(Math.random() * POSITIONS.length)];
+        document.getElementById('drill-hole').textContent = hole[0].str + ' ' + hole[1].str;
+        document.getElementById('drill-position').textContent = pos;
+        document.getElementById('drill-answer').value = '';
+        document.getElementById('drill-feedback').textContent = '';
+        document.getElementById('drill-feedback').className = 'drill-feedback';
+        document.getElementById('drill-question').style.display = 'block';
+        document.getElementById('btn-drill-start').style.display = 'none';
+        window._drillHole = hole;
+        window._drillPos = pos;
+        window._drillSug = suggestPreflop(hole, pos, 5);
+      }
+      document.getElementById('btn-drill-start').addEventListener('click', function() {
+        drillTotal = 5;
+        drillIndex = 0;
+        drillCorrect = 0;
+        nextDrillQuestion();
+      });
+      document.getElementById('btn-drill-submit').addEventListener('click', function() {
+        const ans = (document.getElementById('drill-answer').value || '').toLowerCase();
+        const sug = window._drillSug;
+        const fb = document.getElementById('drill-feedback');
+        if (!sug) return;
+        const correct = ans === sug.action;
+        if (correct) drillCorrect++;
+        fb.textContent = correct ? 'Correct!' : 'AI says: ' + sug.action;
+        fb.className = 'drill-feedback ' + (correct ? 'correct' : 'incorrect');
+        drillIndex++;
+        setTimeout(nextDrillQuestion, 800);
+      });
+
+      document.getElementById('btn-settings-save').addEventListener('click', function() {
+        saveSettings({
+          rpc: document.getElementById('setting-rpc').value.trim(),
+          contract: document.getElementById('setting-contract').value.trim()
+        });
+        alert('Settings saved.');
+      });
+
+      refreshDashboard();
+
+      function getLevelTitle(level) {
+        return LEVEL_TITLES[Math.min(level, LEVEL_TITLES.length - 1)] || 'Rookie';
+      }
+      function getStakesTierLabel(tier) {
+        var labels = ['Micro','Micro+','Low','Low+','Mid','Mid+','High','High+','High Stakes','Top','Elite'];
+        return labels[Math.min(Math.max(0, tier), labels.length - 1)];
+      }
+      function formatTimestamp(ts) {
+        if (!ts) return '-';
+        var d = new Date(ts * 1000);
+        return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+      }
+      function computeQualityBand(suggestion, actualAction) {
+        var match = (suggestion || '').toLowerCase() === (actualAction || '').toLowerCase();
+        return match ? 8 : 3;
+      }
+      function getSessionById(sessionId) {
+        var sessions = loadSessions();
+        for (var i = 0; i < sessions.length; i++) {
+          if (sessions[i].session_id === sessionId) return sessions[i];
+        }
+        return null;
+      }
+      function renderSessionDetail(sessionId) {
+        var s = getSessionById(sessionId);
+        if (!s) return;
+        var hands = s.hands || [];
+        var match = 0;
+        hands.forEach(function(h) {
+          if ((h.action_taken || '').toLowerCase() === (h.ai_suggestion || '').toLowerCase()) match++;
+        });
+        var level = hands.length === 0 ? 0 : Math.min(19, Math.floor(hands.length / 50) + Math.floor((match / hands.length) * 5));
+        var html = '<h3>Session ' + (sessionId || '').slice(0, 16) + '...</h3>';
+        html += '<p>Stakes: ' + getStakesTierLabel(s.stakes_tier || 0) + ' (tier ' + (s.stakes_tier || 0) + ')</p>';
+        html += '<p>Hands: ' + hands.length + ' | AI agreement: ' + match + ' | Level: ' + getLevelTitle(level) + '</p>';
+        html += '<p>Opened: ' + formatTimestamp(s.opened_at) + '</p>';
+        html += '<ul class="session-list">';
+        hands.slice(-20).reverse().forEach(function(h) {
+          html += '<li class="hand-history-item">' + (h.hole || []).join(' ') + ' &rarr; <span class="action">' + (h.action_taken || '') + '</span> <span class="ai">(AI: ' + (h.ai_suggestion || '') + ')</span></li>';
