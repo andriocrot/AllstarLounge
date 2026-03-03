@@ -482,3 +482,124 @@
         <p>Think in ranges, not single hands. Tighten vs raises, loosen when you have position. Use the Range tab to see BTN open ranges.</p>
       </div>
       <div class="help-section">
+        <h4>Bluffing</h4>
+        <p>Bluff more on dry boards and when you have position. Balance value and bluff for GTO play.</p>
+      </div>
+      <div class="help-section">
+        <h4>Levels</h4>
+        <p>Your training level (Rookie to AI Pro) is computed from total hands played and how often your action matched the AI suggestion. Play 50+ hands and aim for high agreement to level up.</p>
+      </div>
+      <div class="help-section">
+        <h4>Range tab</h4>
+        <p>The Range matrix shows approximate BTN open ranges: green = raise, yellow = call, red = fold. Use it as a reference for preflop play from the button.</p>
+      </div>
+      <div class="help-section">
+        <h4>Settings</h4>
+        <p>RPC URL and PokerPro contract address are used only if you integrate with a wallet or PP1000 for on-chain session anchoring. Leave default if you only use the browser.</p>
+      </div>
+    </section>
+
+    <section id="panel-levels" class="panel">
+      <h2>Training Levels</h2>
+      <p class="panel-intro">Reach levels by playing hands and matching AI suggestions. Each level unlocks at 50 hands base + agreement bonus. Level titles: Rookie through AI Pro.</p>
+      <div class="stats-row">
+        <div class="stat-card"><span class="value" id="l-current">0</span><br><span class="label">Current level</span></div>
+        <div class="stat-card"><span class="value" id="l-next-hands">50</span><br><span class="label">Hands to next</span></div>
+      </div>
+      <div class="help-section" style="margin-top: 1rem;">
+        <h4>Level list</h4>
+        <ul id="levels-list" style="list-style: none; font-size: 0.9rem;"></ul>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>AllstarLounge — PokerPro AI Training. Data is stored locally in this browser unless you connect to PP1000 or a PokerPro contract.</p>
+    <p style="margin-top: 0.5rem;">Hand evaluator and AI suggestions run entirely in the browser. For full session persistence and optional on-chain anchoring, use the PP1000 desktop app.</p>
+  </footer>
+
+  <script>
+    (function() {
+      const RANK_NAMES = ['2','3','4','5','6','7','8','9','T','J','Q','K','A'];
+      const SUIT_NAMES = ['c','d','h','s'];
+      const HAND_NAMES = ['High Card','Pair','Two Pair','Three of a Kind','Straight','Flush','Full House','Four of a Kind','Straight Flush','Royal Flush'];
+      const LEVEL_TITLES = ['Rookie','Beginner','Learner','Improving','Developing','Intermediate','Solid','Advanced','Strong','Expert','Sharp','Pro','Elite','Master','Champion','Legend','Hall of Fame','All-Star','PokerPro','AI Pro'];
+
+      function storageKey(k) { return 'allstarlounge_' + k; }
+      function loadSessions() {
+        try {
+          const raw = localStorage.getItem(storageKey('sessions'));
+          return raw ? JSON.parse(raw) : [];
+        } catch (e) { return []; }
+      }
+      function saveSessions(sessions) {
+        localStorage.setItem(storageKey('sessions'), JSON.stringify(sessions));
+      }
+      function loadSettings() {
+        try {
+          const raw = localStorage.getItem(storageKey('settings'));
+          return raw ? JSON.parse(raw) : {};
+        } catch (e) { return {}; }
+      }
+      function saveSettings(s) {
+        localStorage.setItem(storageKey('settings'), JSON.stringify(s));
+      }
+
+      function parseCard(s) {
+        s = String(s).trim().toUpperCase();
+        if (s.length < 2) return null;
+        let r = s.charAt(0);
+        if (s.length >= 3 && s.slice(0,2) === '10') r = 'T';
+        const ri = RANK_NAMES.indexOf(r);
+        const si = SUIT_NAMES.indexOf(s.charAt(s.length - 1));
+        if (ri === -1 || si === -1) return null;
+        return { rank: ri, suit: si, str: RANK_NAMES[ri] + SUIT_NAMES[si] };
+      }
+
+      function rankCounts(cards) {
+        const c = {};
+        cards.forEach(function(card) { c[card.rank] = (c[card.rank] || 0) + 1; });
+        const pairs = [];
+        for (let r in c) pairs.push([c[r], parseInt(r, 10)]);
+        pairs.sort(function(a,b) { return b[0] - a[0] || b[1] - a[1]; });
+        return pairs;
+      }
+      function isFlush(cards) {
+        const bySuit = {};
+        cards.forEach(function(c) {
+          bySuit[c.suit] = bySuit[c.suit] || [];
+          bySuit[c.suit].push(c.rank);
+        });
+        for (let s in bySuit) {
+          if (bySuit[s].length >= 5) {
+            bySuit[s].sort(function(a,b) { return b - a; });
+            return bySuit[s].slice(0, 5);
+          }
+        }
+        return null;
+      }
+      function isStraight(ranks) {
+        const r = ranks.slice().filter(function(v,i,a) { return a.indexOf(v) === i; }).sort(function(a,b) { return b - a; });
+        for (let i = 0; i <= r.length - 5; i++) {
+          const run = r.slice(i, i + 5);
+          if (run[0] - run[4] === 4) return run[0];
+        }
+        if (r.indexOf(12) >= 0 && r.indexOf(3) >= 0 && r.indexOf(2) >= 0 && r.indexOf(1) >= 0 && r.indexOf(0) >= 0) return 3;
+        return null;
+      }
+      function evaluateHand(cards) {
+        if (cards.length < 5) return null;
+        const ranks = cards.map(function(c) { return c.rank; });
+        const rankCnt = rankCounts(cards);
+        const flush = isFlush(cards);
+        const straight = isStraight(ranks);
+        if (flush && straight !== null) {
+          const sr = ranks.slice().filter(function(v,i,a) { return a.indexOf(v) === i; }).sort(function(a,b) { return b - a; });
+          for (let i = 0; i <= sr.length - 5; i++) {
+            const run = sr.slice(i, i + 5);
+            if (run[0] - run[4] === 4 || (run[0] === 12 && run[4] === 0)) return { type: run[0] === 12 && run[1] === 11 ? 10 : 9, kickers: [run[0]] };
+          }
+        }
+        if (rankCnt[0][0] === 4) return { type: 8, kickers: [rankCnt[0][1]].concat(ranks.filter(function(r) { return r !== rankCnt[0][1]; }).sort(function(a,b) { return b - a; }).slice(0, 1)) };
+        if (rankCnt[0][0] >= 3 && rankCnt[1] && rankCnt[1][0] >= 2) return { type: 7, kickers: [rankCnt[0][1], rankCnt[1][1]] };
+        if (flush) return { type: 6, kickers: flush };
