@@ -1208,3 +1208,114 @@
       }
       function stakesTiersCount() {
         return 11;
+      }
+      function qualityBandsCount() {
+        return 11;
+      }
+      function formatCardForDisplay(card) {
+        if (!card) return '';
+        return (RANK_NAMES[card.rank] || '') + (SUIT_NAMES[card.suit] || '');
+      }
+      function formatHoleForDisplay(hole) {
+        if (!hole || hole.length < 2) return '';
+        return formatCardForDisplay(hole[0]) + ' ' + formatCardForDisplay(hole[1]);
+      }
+      function compareHandsForDisplay(h1, h2) {
+        if (!h1 || h1.length < 5 || !h2 || h2.length < 5) return 0;
+        var e1 = evaluateHand(h1), e2 = evaluateHand(h2);
+        if (e1.type !== e2.type) return e1.type > e2.type ? 1 : -1;
+        for (var i = 0; i < (e1.kickers || []).length; i++) {
+          var a = (e1.kickers || [])[i], b = (e2.kickers || [])[i];
+          if (a !== b) return a > b ? 1 : -1;
+        }
+        return 0;
+      }
+      function isValidCardString(s) {
+        return parseCard(s) !== null;
+      }
+      function getHandNameFromType(type) {
+        return HAND_NAMES[type - 1] || 'Unknown';
+      }
+      function getRangeActionForHand(highRank, lowRank, suited) {
+        if (highRank === lowRank) return highRank >= 8 ? 'raise' : (highRank >= 5 ? 'call' : 'fold');
+        if (highRank >= 11 && lowRank >= 9) return 'raise';
+        if (highRank >= 9 && lowRank >= 7 && suited) return 'call';
+        if (highRank >= 8 && lowRank >= 6) return 'call';
+        return 'fold';
+      }
+      function rankFromChar(ch) {
+        var i = RANK_NAMES.indexOf(String(ch).toUpperCase());
+        return i >= 0 ? i : -1;
+      }
+      function suitFromChar(ch) {
+        var names = ['c','d','h','s'];
+        var i = names.indexOf(String(ch).toLowerCase());
+        return i >= 0 ? i : -1;
+      }
+      function cardFromString(s) {
+        return parseCard(s);
+      }
+      function evaluateHandSafe(cards) {
+        if (!cards || cards.length < 5) return null;
+        return evaluateHand(cards);
+      }
+      function bestFiveFromSevenSafe(cards) {
+        if (!cards || cards.length !== 7) return null;
+        return bestFiveFromSeven(cards);
+      }
+      function computeLevelFromStats(totalHands, agreementCount) {
+        if (totalHands === 0) return 0;
+        var rate = agreementCount / totalHands;
+        var base = Math.min(19, Math.floor(totalHands / 50));
+        var bonus = Math.floor(rate * 5);
+        return Math.min(19, base + bonus);
+      }
+      function requiredHandsForLevel(level) {
+        return (level + 1) * 50;
+      }
+      function agreementRateForLevel(level) {
+        return 0.4 + level * 0.03;
+      }
+      function getAppName() {
+        return 'AllstarLounge';
+      }
+      function getAppVersion() {
+        return '1.0.0';
+      }
+      function isPanelVisible(panelId) {
+        var p = document.getElementById('panel-' + panelId);
+        return p && p.classList.contains('visible');
+      }
+      function totalSessionsCount() {
+        return loadSessions().length;
+      }
+      window.AllstarLounge = {
+        loadSessions: loadSessions,
+        saveSessions: saveSessions,
+        getLevelTitle: getLevelTitle,
+        exportSessionsJson: exportSessionsJson,
+        exportSessionsCsv: exportSessionsCsv,
+        dailyGoalProgress: dailyGoalProgress,
+        allSessionsSummary: allSessionsSummary,
+        getSessionSummary: getSessionSummary,
+        suggestPreflopFromStrings: suggestPreflopFromStrings,
+        suggestPostflopFromStrings: suggestPostflopFromStrings,
+        LEVEL_TITLES: LEVEL_TITLES,
+        RANK_NAMES: RANK_NAMES,
+        HAND_NAMES: HAND_NAMES,
+        parseCard: parseCard,
+        evaluateHand: evaluateHand,
+        suggestPreflop: suggestPreflop,
+        suggestPostflop: suggestPostflop,
+        getRangeActionForHand: getRangeActionForHand,
+        getStakesTierLabel: getStakesTierLabel
+      };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() { initLevelsList(); refreshDashboard(); });
+      } else {
+        initLevelsList();
+      }
+    })();
+  </script>
+</body>
+</html>
