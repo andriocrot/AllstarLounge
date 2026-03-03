@@ -361,3 +361,124 @@
         <input type="number" id="preflop-tier" min="0" max="10" value="5" />
       </div>
       <p class="keyboard-hint">Tier 0 = micro, 10 = elite. Default 5 = mid stakes.</p>
+      <button type="button" class="primary" id="btn-preflop">Get suggestion</button>
+      <div class="ai-suggestion" id="preflop-result" style="display: none;">
+        <div class="action" id="preflop-action"></div>
+        <div class="reasoning" id="preflop-reasoning"></div>
+      </div>
+    </section>
+
+    <section id="panel-ai-postflop" class="panel">
+      <h2>AI Postflop Suggestion</h2>
+      <div class="form-group">
+        <label for="postflop-hole">Hole cards</label>
+        <input type="text" id="postflop-hole" placeholder="As Kh" />
+      </div>
+      <div class="form-group">
+        <label for="postflop-board">Board</label>
+        <input type="text" id="postflop-board" placeholder="Qd Jc Th 2s" />
+      </div>
+      <div class="form-group">
+        <label for="postflop-pot">Pot fraction (0–1). Your bet size relative to pot.</label>
+        <input type="number" id="postflop-pot" min="0" max="1" step="0.1" value="0.3" />
+      </div>
+      <p class="keyboard-hint">0.3 = 30% pot bet. Affects AI aggression.</p>
+      <button type="button" class="primary" id="btn-postflop">Get suggestion</button>
+      <div class="ai-suggestion" id="postflop-result" style="display: none;">
+        <div class="action" id="postflop-action"></div>
+        <div class="reasoning" id="postflop-reasoning"></div>
+      </div>
+    </section>
+
+    <section id="panel-sessions" class="panel">
+      <h2>Session History</h2>
+      <p>Recent training sessions (stored in browser).</p>
+      <ul class="session-list" id="session-list"></ul>
+      <div id="session-detail-container" style="display: none; margin-top: 1rem; padding: 1rem; background: var(--bg-dark); border-radius: var(--radius);"></div>
+      <button type="button" class="primary" id="btn-new-session" style="margin-top: 1rem;">Start new session</button>
+    </section>
+
+    <section id="panel-stats" class="panel">
+      <h2>Stats &amp; Progress</h2>
+      <div class="stats-row">
+        <div class="stat-card"><span class="value" id="s-sessions">0</span><br><span class="label">Sessions</span></div>
+        <div class="stat-card"><span class="value" id="s-hands">0</span><br><span class="label">Total hands</span></div>
+        <div class="stat-card"><span class="value" id="s-agreement">0%</span><br><span class="label">AI agreement</span></div>
+        <div class="stat-card"><span class="value" id="s-level">0</span><br><span class="label">Level</span></div>
+      </div>
+      <h3 style="margin-top: 1.5rem; font-size: 1rem;">Actions taken</h3>
+      <div id="stats-actions"></div>
+    </section>
+
+    <section id="panel-drills" class="panel">
+      <h2>Drills</h2>
+      <p>Preflop decision drill. We show a hand and position; you choose raise / call / fold.</p>
+      <div class="drill-question" id="drill-question" style="display: none;">
+        <div class="hole-cards" id="drill-hole"></div>
+        <div>Position: <strong id="drill-position"></strong></div>
+        <div class="form-group" style="margin-top: 0.75rem;">
+          <label>Your action</label>
+          <select id="drill-answer">
+            <option value="">Select</option>
+            <option value="raise">Raise</option>
+            <option value="call">Call</option>
+            <option value="fold">Fold</option>
+          </select>
+        </div>
+        <button type="button" class="primary" id="btn-drill-submit">Submit</button>
+        <div class="drill-feedback" id="drill-feedback"></div>
+      </div>
+      <button type="button" class="primary" id="btn-drill-start">Start drill (5 hands)</button>
+    </section>
+
+    <section id="panel-settings" class="panel">
+      <h2>Settings</h2>
+      <div class="form-group">
+        <label for="setting-rpc">RPC URL (for optional contract)</label>
+        <input type="text" id="setting-rpc" placeholder="https://rpc.ankr.com/eth" />
+      </div>
+      <div class="form-group">
+        <label for="setting-contract">PokerPro contract address</label>
+        <input type="text" id="setting-contract" placeholder="0x..." />
+      </div>
+      <button type="button" class="primary" id="btn-settings-save">Save</button>
+    </section>
+
+    <section id="panel-range" class="panel">
+      <h2>Range Matrix (BTN open)</h2>
+      <p class="panel-intro">Approximate raise / call / fold from BTN. Green = raise, yellow = call, red = fold.</p>
+      <div class="range-legend">
+        <span><span class="swatch raise"></span> Raise</span>
+        <span><span class="swatch call"></span> Call</span>
+        <span><span class="swatch fold"></span> Fold</span>
+      </div>
+      <div class="range-matrix" id="range-matrix"></div>
+    </section>
+
+    <section id="panel-help" class="panel">
+      <h2>Help</h2>
+      <div class="help-section">
+        <h4>Preflop</h4>
+        <p>Play tighter from early position (UTG, HJ). Raise premium pairs and strong broadway. Call more from BTN/CO with suited connectors.</p>
+      </div>
+      <div class="help-section">
+        <h4>Postflop</h4>
+        <p>Value bet when you have a strong hand. Check when marginal. Consider pot odds before calling.</p>
+      </div>
+      <div class="help-section">
+        <h4>Position</h4>
+        <p>Later position = more hands to play. BTN is most profitable. Play fewer hands from SB/BB without premium.</p>
+      </div>
+      <div class="help-section">
+        <h4>Equity</h4>
+        <p>Your share of the pot when all-in. Use break-even equity (call / (pot + call)) to decide calls.</p>
+      </div>
+      <div class="help-section">
+        <h4>Drills</h4>
+        <p>Use preflop and postflop drills to build muscle memory. Range quiz improves hand reading.</p>
+      </div>
+      <div class="help-section">
+        <h4>Ranges</h4>
+        <p>Think in ranges, not single hands. Tighten vs raises, loosen when you have position. Use the Range tab to see BTN open ranges.</p>
+      </div>
+      <div class="help-section">
