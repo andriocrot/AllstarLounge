@@ -603,3 +603,124 @@
         if (rankCnt[0][0] === 4) return { type: 8, kickers: [rankCnt[0][1]].concat(ranks.filter(function(r) { return r !== rankCnt[0][1]; }).sort(function(a,b) { return b - a; }).slice(0, 1)) };
         if (rankCnt[0][0] >= 3 && rankCnt[1] && rankCnt[1][0] >= 2) return { type: 7, kickers: [rankCnt[0][1], rankCnt[1][1]] };
         if (flush) return { type: 6, kickers: flush };
+        if (straight !== null) return { type: 5, kickers: [straight] };
+        if (rankCnt[0][0] === 3) return { type: 4, kickers: [rankCnt[0][1]].concat(ranks.filter(function(r) { return r !== rankCnt[0][1]; }).sort(function(a,b) { return b - a; }).slice(0, 2)) };
+        if (rankCnt[0][0] === 2 && rankCnt[1] && rankCnt[1][0] === 2) {
+          const k = [rankCnt[0][1], rankCnt[1][1]].sort(function(a,b) { return b - a; });
+          return { type: 3, kickers: k.concat(ranks.filter(function(r) { return k.indexOf(r) < 0; }).sort(function(a,b) { return b - a; }).slice(0, 1)) };
+        }
+        if (rankCnt[0][0] === 2) return { type: 2, kickers: [rankCnt[0][1]].concat(ranks.filter(function(r) { return r !== rankCnt[0][1]; }).sort(function(a,b) { return b - a; }).slice(0, 3)) };
+        return { type: 1, kickers: ranks.sort(function(a,b) { return b - a; }).slice(0, 5) };
+      }
+      function bestFiveFromSeven(cards) {
+        let best = null;
+        const indices = [0,1,2,3,4,5,6];
+        for (let i = 0; i < indices.length; i++) {
+          for (let j = i + 1; j < indices.length; j++) {
+            const five = indices.filter(function(_, idx) { return idx !== i && idx !== j; }).map(function(idx) { return cards[idx]; });
+            const ev = evaluateHand(five);
+            if (ev && (!best || ev.type > best.type || (ev.type === best.type && ev.kickers.join(',') > best.kickers.join(',')))) best = ev;
+          }
+        }
+        return best;
+      }
+
+      function suggestPreflop(hole, position, tier) {
+        const r1 = hole[0].rank, r2 = hole[1].rank;
+        const high = Math.max(r1, r2), low = Math.min(r1, r2);
+        const suited = hole[0].suit === hole[1].suit;
+        const pp = r1 === r2;
+        if (pp && high >= 9) return { action: 'raise', confidence: 0.92, reasoning: 'Premium pair; raise for value.' };
+        if (high >= 11 && low >= 9 && (suited || pp)) return { action: 'raise', confidence: 0.85, reasoning: 'Strong hand; build pot.' };
+        if (high >= 10 && suited) return { action: 'call', confidence: 0.72, reasoning: 'Playable suited; see flop.' };
+        if (['btn','co','hj'].indexOf(position) >= 0 && high >= 8) return { action: 'call', confidence: 0.58, reasoning: 'Positional play.' };
+        if (tier >= 7 && high < 8 && !suited) return { action: 'fold', confidence: 0.88, reasoning: 'Weak hand at high stakes.' };
+        return { action: 'fold', confidence: 0.65, reasoning: 'Marginal; fold in early position.' };
+      }
+      function suggestPostflop(hole, board, potFrac) {
+        const allCards = hole.concat(board);
+        if (allCards.length < 5) return { action: 'check', confidence: 0.5, reasoning: 'Insufficient board.' };
+        const ev = board.length >= 5 ? bestFiveFromSeven(hole.concat(board)) : null;
+        if (!ev) return { action: 'check', confidence: 0.5, reasoning: 'Evaluating.' };
+        if (ev.type >= 7) return { action: 'bet', confidence: 0.9, reasoning: 'Strong made hand; value bet.' };
+        if (ev.type >= 5 && potFrac < 0.4) return { action: 'bet', confidence: 0.75, reasoning: 'Good hand; build pot.' };
+        if (ev.type >= 3) return { action: 'check', confidence: 0.6, reasoning: 'Medium strength; pot control.' };
+        return { action: 'check', confidence: 0.55, reasoning: 'Weak; check or fold.' };
+      }
+
+      function refreshDashboard() {
+        const sessions = loadSessions();
+        let totalHands = 0, match = 0;
+        sessions.forEach(function(s) {
+          const h = s.hands || [];
+          totalHands += h.length;
+          h.forEach(function(hand) {
+            if ((hand.action_taken || '').toLowerCase() === (hand.ai_suggestion || '').toLowerCase()) match++;
+          });
+        });
+        const level = totalHands === 0 ? 0 : Math.min(19, Math.floor(totalHands / 50) + Math.floor((match / totalHands) * 5));
+        document.getElementById('d-total-sessions').textContent = sessions.length;
+        document.getElementById('d-total-hands').textContent = totalHands;
+        document.getElementById('d-level').textContent = level;
+        document.getElementById('d-agreement').textContent = totalHands ? (100 * match / totalHands).toFixed(1) + '%' : '0%';
+        const goal = 50;
+        const todayStart = Math.floor(Date.now() / 86400000) * 86400000;
+        let todayHands = 0;
+        sessions.forEach(function(s) {
+          (s.hands || []).forEach(function(h) {
+            if (h.timestamp >= todayStart) todayHands++;
+          });
+        });
+        const pct = Math.min(100, (100 * todayHands / goal));
+        document.getElementById('d-progress').style.width = pct + '%';
+        var levelTitleEl = document.getElementById('d-level-title');
+        if (levelTitleEl) levelTitleEl.textContent = LEVEL_TITLES[level] || 'Rookie';
+        var dailyEl = document.getElementById('d-daily-hands');
+        if (dailyEl) dailyEl.textContent = todayHands;
+      }
+      function buildRangeMatrix() {
+        var grid = document.getElementById('range-matrix');
+        if (!grid) return;
+        grid.innerHTML = '';
+        function action(r1, r2) {
+          if (r1 < r2) { var t = r1; r1 = r2; r2 = t; }
+          if (r1 === r2) return r1 >= 8 ? 'raise' : (r1 >= 5 ? 'call' : 'fold');
+          if (r1 === 12 && r2 >= 10) return 'raise';
+          if (r1 >= 10 && r2 >= 9) return 'raise';
+          if (r1 >= 9 && r2 >= 7) return 'call';
+          return 'fold';
+        }
+        for (var c = 0; c < 13; c++) {
+          var headerCell = document.createElement('div');
+          headerCell.className = 'cell';
+          headerCell.textContent = RANK_NAMES[c];
+          grid.appendChild(headerCell);
+        }
+        for (var r = 0; r < 13; r++) {
+          var rowLabel = document.createElement('div');
+          rowLabel.className = 'cell';
+          rowLabel.textContent = RANK_NAMES[r];
+          grid.appendChild(rowLabel);
+          for (var c = 0; c < 13; c++) {
+            var cell = document.createElement('div');
+            cell.className = 'cell ' + action(r, c);
+            cell.textContent = r >= c ? (r === c ? 'P' : 'S') : '';
+            grid.appendChild(cell);
+          }
+        }
+      }
+      function showPanel(id) {
+        document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('visible'); });
+        document.querySelectorAll('.nav-btn').forEach(function(b) { b.classList.remove('active'); });
+        const panel = document.getElementById('panel-' + id);
+        if (panel) panel.classList.add('visible');
+        const btn = document.querySelector('.nav-btn[data-panel="' + id + '"]');
+        if (btn) btn.classList.add('active');
+        if (id === 'dashboard') refreshDashboard();
+        if (id === 'sessions') renderSessionList();
+        if (id === 'stats') refreshStats();
+        if (id === 'settings') loadSettingsIntoForm();
+        if (id === 'range') buildRangeMatrix();
+        if (id === 'levels') refreshLevelsPanel();
+      }
+      function refreshLevelsPanel() {
