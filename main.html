@@ -1087,3 +1087,124 @@
             dist[b] = (dist[b] || 0) + 1;
           });
         });
+        return dist;
+      }
+      function handStrengthTier(hole, board) {
+        if (!board || board.length < 3) {
+          var high = Math.max(hole[0].rank, hole[1].rank);
+          var low = Math.min(hole[0].rank, hole[1].rank);
+          if (hole[0].rank === hole[1].rank && high >= 11) return 9;
+          if (hole[0].rank === hole[1].rank && high >= 8) return 7;
+          if (high >= 11 && low >= 9) return 6;
+          if (high >= 9) return 4;
+          return 2;
+        }
+        var allCards = hole.concat(board);
+        var ev = allCards.length >= 5 ? (allCards.length === 7 ? bestFiveFromSeven(allCards) : evaluateHand(allCards.slice(0, 5))) : null;
+        return ev ? Math.min(9, ev.type + 1) : 0;
+      }
+      function parseCardsLine(line, minCards, maxCards) {
+        minCards = minCards || 0;
+        maxCards = maxCards || 7;
+        var parts = line.replace(/,/g, ' ').split(/\s+/);
+        var cards = [];
+        for (var i = 0; i < parts.length && cards.length < maxCards; i++) {
+          var c = parseCard(parts[i].trim());
+          if (c) cards.push(c);
+        }
+        if (minCards && cards.length < minCards) return null;
+        return cards;
+      }
+      function validateNoDuplicateCards(cards) {
+        var seen = {};
+        for (var i = 0; i < cards.length; i++) {
+          var idx = cards[i].rank * 4 + cards[i].suit;
+          if (seen[idx]) return false;
+          seen[idx] = true;
+        }
+        return true;
+      }
+      function levelRequirementHands(level) {
+        return (level + 1) * 50;
+      }
+      function levelRequirementAgreementRate(level) {
+        return 0.4 + level * 0.03;
+      }
+      function sessionsInRange(tsStart, tsEnd) {
+        return loadSessions().filter(function(s) {
+          var t = s.opened_at || 0;
+          return t >= tsStart && t <= tsEnd;
+        });
+      }
+      function sessionsByTier(tier) {
+        return loadSessions().filter(function(s) { return (s.stakes_tier || 0) === tier; });
+      }
+      function initLevelsList() {
+        var listEl = document.getElementById('levels-list');
+        if (!listEl) return;
+        if (listEl.children.length > 0) return;
+        for (var i = 0; i < LEVEL_TITLES.length; i++) {
+          var li = document.createElement('li');
+          li.textContent = (i + 1) + '. ' + LEVEL_TITLES[i] + ' (' + ((i + 1) * 50) + ' hands base)';
+          listEl.appendChild(li);
+        }
+      }
+      function getSessionSummary(session) {
+        var hands = session.hands || [];
+        var match = 0;
+        hands.forEach(function(h) {
+          if ((h.action_taken || '').toLowerCase() === (h.ai_suggestion || '').toLowerCase()) match++;
+        });
+        var level = hands.length === 0 ? 0 : Math.min(19, Math.floor(hands.length / 50) + Math.floor((match / hands.length) * 5));
+        return { hands: hands.length, match: match, level: level, title: getLevelTitle(level) };
+      }
+      function allSessionsSummary() {
+        var sessions = loadSessions();
+        var totalHands = 0, totalMatch = 0;
+        sessions.forEach(function(s) {
+          var sum = getSessionSummary(s);
+          totalHands += sum.hands;
+          totalMatch += sum.match;
+        });
+        var level = totalHands === 0 ? 0 : Math.min(19, Math.floor(totalHands / 50) + Math.floor((totalMatch / totalHands) * 5));
+        return { sessions: sessions.length, totalHands: totalHands, totalMatch: totalMatch, level: level, title: getLevelTitle(level) };
+      }
+      function suggestPreflopFromStrings(holeStr, position, tier) {
+        var parts = (holeStr || '').trim().split(/\s+/);
+        if (parts.length < 2) return null;
+        var c1 = parseCard(parts[0]), c2 = parseCard(parts[1]);
+        if (!c1 || !c2) return null;
+        return suggestPreflop([c1, c2], position || 'btn', tier || 5);
+      }
+      function suggestPostflopFromStrings(holeStr, boardStr, potFrac) {
+        var holeParts = (holeStr || '').trim().split(/\s+/);
+        var boardParts = (boardStr || '').trim().split(/\s+/);
+        if (holeParts.length < 2) return null;
+        var hole = [];
+        var c1 = parseCard(holeParts[0]), c2 = parseCard(holeParts[1]);
+        if (!c1 || !c2) return null;
+        hole.push(c1, c2);
+        var board = [];
+        boardParts.forEach(function(p) { var c = parseCard(p); if (c) board.push(c); });
+        return suggestPostflop(hole, board, potFrac || 0.3);
+      }
+      function generateSessionId() {
+        var hex = '0123456789abcdef';
+        var out = '';
+        for (var i = 0; i < 32; i++) out += hex[Math.floor(Math.random() * 16)];
+        return out;
+      }
+      function ensureConfigDir() {
+        return true;
+      }
+      function defaultRpcUrl() {
+        return 'https://rpc.ankr.com/eth';
+      }
+      function maxHandsPerSession() {
+        return 1024;
+      }
+      function trainingLevelsCount() {
+        return 20;
+      }
+      function stakesTiersCount() {
+        return 11;
