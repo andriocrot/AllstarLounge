@@ -966,3 +966,124 @@
         html += '<ul class="session-list">';
         hands.slice(-20).reverse().forEach(function(h) {
           html += '<li class="hand-history-item">' + (h.hole || []).join(' ') + ' &rarr; <span class="action">' + (h.action_taken || '') + '</span> <span class="ai">(AI: ' + (h.ai_suggestion || '') + ')</span></li>';
+        });
+        html += '</ul>';
+        return html;
+      }
+      function showSessionDetail(sessionId) {
+        var container = document.getElementById('session-detail-container');
+        if (!container) return;
+        container.innerHTML = renderSessionDetail(sessionId);
+        container.style.display = 'block';
+      }
+      function potOdds(callAmt, potAfterCall) {
+        if (potAfterCall <= 0) return 0;
+        return callAmt / potAfterCall;
+      }
+      function breakEvenEquity(callAmt, potBeforeCall) {
+        var total = potBeforeCall + callAmt;
+        if (total <= 0) return 0;
+        return callAmt / total;
+      }
+      function suggestedActionByEquity(equity, be, margin) {
+        margin = margin || 0.05;
+        if (equity >= be + margin) return 'call';
+        if (equity <= be - margin) return 'fold';
+        return 'marginal';
+      }
+      function bluffFrequencySuggestion(position, boardTexture) {
+        var posFreq = { btn: 0.45, co: 0.35, hj: 0.28, utg: 0.2, sb: 0.4, bb: 0.25 };
+        var texFreq = { dry: 0.35, wet: 0.25, paired: 0.2, monotone: 0.15 };
+        var p = posFreq[position] || 0.3;
+        var t = texFreq[boardTexture] || 0.3;
+        return (p + t) / 2;
+      }
+      function rangeMatrixRaiseBtn() {
+        var out = {};
+        for (var r1 = 0; r1 < 13; r1++) {
+          for (var r2 = 0; r2 < 13; r2++) {
+            var high = Math.max(r1, r2), low = Math.min(r1, r2);
+            var key = RANK_NAMES[high] + RANK_NAMES[low] + (high !== low ? 's' : '');
+            if (high === r1 && low === r2) key += 's';
+            else if (high !== low) key = RANK_NAMES[high] + RANK_NAMES[low] + 'o';
+            var pct = 50;
+            if (r1 === r2) pct = r1 >= 8 ? 100 : (r1 >= 5 ? 60 : 20);
+            else if (high >= 11 && low >= 9) pct = 90;
+            else if (high >= 9) pct = 50;
+            else pct = 20;
+            out[key] = pct;
+          }
+        }
+        return out;
+      }
+      function aggregateStatsByTier(sessions) {
+        var byTier = {};
+        sessions.forEach(function(s) {
+          var t = s.stakes_tier || 0;
+          (s.hands || []).forEach(function(h) {
+            var match = (h.action_taken || '').toLowerCase() === (h.ai_suggestion || '').toLowerCase();
+            byTier[t] = byTier[t] || { match: 0, total: 0 };
+            byTier[t].total++;
+            if (match) byTier[t].match++;
+          });
+        });
+        return byTier;
+      }
+      function dailyGoalHands() { return 50; }
+      function dailyGoalProgress() {
+        var sessions = loadSessions();
+        var todayStart = Math.floor(Date.now() / 86400000) * 86400000;
+        var todayHands = 0;
+        sessions.forEach(function(s) {
+          (s.hands || []).forEach(function(h) {
+            if (h.timestamp >= todayStart) todayHands++;
+          });
+        });
+        return { current: todayHands, goal: dailyGoalHands() };
+      }
+      function exportSessionsJson() {
+        var sessions = loadSessions();
+        return JSON.stringify(sessions, null, 2);
+      }
+      function exportSessionsCsv() {
+        var sessions = loadSessions();
+        var lines = ['session_id,stakes_tier,opened_at,closed_at,hand_count'];
+        sessions.forEach(function(s) {
+          var hands = s.hands || [];
+          lines.push([s.session_id || '', s.stakes_tier || 0, s.opened_at || '', s.closed_at || '', hands.length].join(','));
+        });
+        return lines.join('\n');
+      }
+      function addHandToLatestSession(handData) {
+        var sessions = loadSessions();
+        if (sessions.length === 0) return false;
+        var last = sessions[sessions.length - 1];
+        if (!last.hands) last.hands = [];
+        handData.timestamp = Date.now() / 1000;
+        last.hands.push(handData);
+        saveSessions(sessions);
+        return true;
+      }
+      function closeLatestSession() {
+        var sessions = loadSessions();
+        if (sessions.length === 0) return false;
+        var last = sessions[sessions.length - 1];
+        last.closed_at = Date.now() / 1000;
+        saveSessions(sessions);
+        return true;
+      }
+      function listSessionsPaginated(page, pageSize) {
+        page = page || 0;
+        pageSize = pageSize || 10;
+        var sessions = loadSessions();
+        var start = page * pageSize;
+        return sessions.slice(-(start + pageSize)).slice(0, pageSize).reverse();
+      }
+      function qualityBandDistribution(sessions) {
+        var dist = {};
+        sessions.forEach(function(s) {
+          (s.hands || []).forEach(function(h) {
+            var b = h.quality_band || 0;
+            dist[b] = (dist[b] || 0) + 1;
+          });
+        });
